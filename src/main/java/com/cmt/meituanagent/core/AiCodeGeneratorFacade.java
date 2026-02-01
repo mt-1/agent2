@@ -1,6 +1,7 @@
 package com.cmt.meituanagent.core;
 
 import com.cmt.meituanagent.ai.AiCodeGeneratorService;
+import com.cmt.meituanagent.ai.AiCodeGeneratorServiceFactory;
 import com.cmt.meituanagent.ai.model.HtmlCodeResult;
 import com.cmt.meituanagent.ai.model.MultiFileCodeResult;
 import com.cmt.meituanagent.core.parser.CodeParserExecutor;
@@ -19,8 +20,11 @@ import java.io.File;
 @Slf4j
 public class AiCodeGeneratorFacade {
 
+//    @Resource
+//    private AiCodeGeneratorService aiCodeGeneratorService;
+
     @Resource
-    private AiCodeGeneratorService aiCodeGeneratorService;
+    private AiCodeGeneratorServiceFactory aiCodeGeneratorServiceFactory;
 
 
     /**
@@ -33,6 +37,8 @@ public class AiCodeGeneratorFacade {
         if (codeGenTypeEnum == null) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "生成类型为空");
         }
+        // 根据 appId 获取相应的 AI 服务实例
+        AiCodeGeneratorService aiCodeGeneratorService = aiCodeGeneratorServiceFactory.getAiCodeGeneratorService(appId, codeGenTypeEnum);
         return switch (codeGenTypeEnum) {
             case HTML ->
             {
@@ -79,9 +85,11 @@ public class AiCodeGeneratorFacade {
         if(codeGenTypeEnum == null) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR,"代码生成类型不能为空");
         }
+        // 根据 appId 获取相应的 AI 服务实例
+        AiCodeGeneratorService aiCodeGeneratorService = aiCodeGeneratorServiceFactory.getAiCodeGeneratorService(appId, codeGenTypeEnum);
         return switch (codeGenTypeEnum){
             case HTML -> {
-                HtmlCodeResult result = aiCodeGeneratorService.generateHtmlCode(userMessage);
+                HtmlCodeResult result = aiCodeGeneratorService.generateHtmlCode(1, userMessage);
                 yield CodeFileSaverExecutor.executeSaver(result, codeGenTypeEnum, appId);
             }
             case MULTI_FILE -> {

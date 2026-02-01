@@ -17,7 +17,7 @@ public class AiCodeGeneratorServiceTest
     @Test
     void generateHtmlCode()
     {
-        HtmlCodeResult result = aiCodeGeneratorService.generateHtmlCode("请生成一个简单的 HTML 页面, 不超过30行");
+        HtmlCodeResult result = aiCodeGeneratorService.generateHtmlCode(1, "请生成一个简单的 HTML 页面, 不超过30行");
         Assertions.assertNotNull(result);
 
     }

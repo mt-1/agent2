@@ -1,13 +1,24 @@
 package com.cmt.meituanagent.ai;
 
+import com.cmt.meituanagent.model.enums.CodeGenTypeEnum;
+import com.cmt.meituanagent.service.ChatHistoryService;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import dev.langchain4j.community.store.memory.chat.redis.RedisChatMemoryStore;
+import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.service.AiServices;
 import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.time.Duration;
+
 @Configuration
+@Slf4j
 public class AiCodeGeneratorServiceFactory {
 
     @Resource
@@ -16,12 +27,61 @@ public class AiCodeGeneratorServiceFactory {
     @Resource
     private StreamingChatModel streamingChatModel;
 
-    @Bean
-    public AiCodeGeneratorService aiCodeGeneratorService() {
-        return AiServices.builder(
-                AiCodeGeneratorService.class)
+    @Resource
+    private RedisChatMemoryStore redisChatMemoryStore;
+
+    @Resource
+    private ChatHistoryService chatHistoryService;
+
+    /**
+     * AI 服务实例缓存
+     * 缓存策略：
+     * - 最大缓存 1000 个实例
+     * - 写入后 30 分钟过期
+     * - 访问后 10 分钟过期
+     */
+    private final Cache<Long, AiCodeGeneratorService> serviceCache = Caffeine.newBuilder()
+            .maximumSize(1000)
+            .expireAfterWrite(Duration.ofMinutes(30))
+            .expireAfterAccess(Duration.ofMinutes(10))
+            .removalListener((key, value, cause) -> {
+                log.debug("AI 服务实例被移除，appId: {}, 原因", key, cause);
+            })
+            .build();
+
+
+    // 兼容
+    public AiCodeGeneratorService getAiCodeGeneratorService(long appId) {
+        return getAiCodeGeneratorService(appId, CodeGenTypeEnum.HTML);
+    }
+
+    // 根据 appId获取带缓存服务
+    public AiCodeGeneratorService getAiCodeGeneratorService(long appId, CodeGenTypeEnum codeGenType) {
+        return serviceCache.get(appId, this::createAiCodeGeneratorService);
+    }
+
+    // 创建新的AI服务实例
+    private AiCodeGeneratorService createAiCodeGeneratorService(long appId) {
+        log.info("为appId: {}创建新的AI服务实例", appId);
+        // 根据appId构建独立的对话记忆
+        MessageWindowChatMemory chatMemory = MessageWindowChatMemory
+                .builder()
+                .id(appId)
+                .chatMemoryStore(redisChatMemoryStore)
+                .maxMessages(20)
+                .build();
+        chatHistoryService.loadChatHistoryToMemory(appId, chatMemory, 20);
+        return AiServices.builder(AiCodeGeneratorService.class)
                 .chatModel(chatModel)
                 .streamingChatModel(streamingChatModel)
+                .chatMemory(chatMemory)
                 .build();
     }
+
+    @Bean
+    public AiCodeGeneratorService aiCodeGeneratorService() {
+        return getAiCodeGeneratorService(0L, CodeGenTypeEnum.HTML);
+    }
+
+
 }
