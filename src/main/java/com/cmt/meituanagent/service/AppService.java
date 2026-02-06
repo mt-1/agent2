@@ -18,6 +18,9 @@ import java.util.List;
  */
 public interface AppService extends IService<App> {
 
+    // 异步生成应用截图并更新数据库封面
+    void generateAppScreenshotAsync(Long appId, String appUrl);
+
     // 获取应用VO
     AppVO getAppVO(App app);
 
@@ -28,7 +31,7 @@ public interface AppService extends IService<App> {
     List<AppVO> getAppVOList(List<App> appList);
 
     // 通过应用id和用户输入的消息，生成代码
-    Flux<String> charToGenCode(Long appId, String message, User loginUser);
+    Flux<String> chatToGenCode(Long appId, String message, User loginUser);
 
     // 应用部署
     String deployApp(Long appId, User loginUser);

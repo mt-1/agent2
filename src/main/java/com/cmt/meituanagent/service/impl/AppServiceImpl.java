@@ -6,6 +6,8 @@ import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
 import com.cmt.meituanagent.constant.AppConstant;
 import com.cmt.meituanagent.core.AiCodeGeneratorFacade;
+import com.cmt.meituanagent.core.builder.VueProjectBuilder;
+import com.cmt.meituanagent.core.handler.StreamHandlerExecutor;
 import com.cmt.meituanagent.exception.BusinessException;
 import com.cmt.meituanagent.exception.ErrorCode;
 import com.cmt.meituanagent.exception.ThrowUtils;
@@ -16,6 +18,7 @@ import com.cmt.meituanagent.model.enums.CodeGenTypeEnum;
 import com.cmt.meituanagent.model.vo.AppVO;
 import com.cmt.meituanagent.model.vo.UserVO;
 import com.cmt.meituanagent.service.ChatHistoryService;
+import com.cmt.meituanagent.service.ScreenshotService;
 import com.cmt.meituanagent.service.UserService;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
@@ -57,8 +60,18 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
     @Lazy
     private ChatHistoryService chatHistoryService;
 
+    @Resource
+    private StreamHandlerExecutor streamHandlerExecutor;
+
+    @Resource
+    private VueProjectBuilder vueProjectBuilder;
+
+    @Resource
+    private ScreenshotService screenshotService;
+
+
     @Override
-    public Flux<String> charToGenCode(Long appId, String message, User loginUser) {
+    public Flux<String> chatToGenCode(Long appId, String message, User loginUser) {
         // 1.参数校验
         ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用id不存在");
         ThrowUtils.throwIf(message == null || message.isEmpty(), ErrorCode.PARAMS_ERROR, "用户输入的消息为空");
@@ -74,26 +87,9 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
         // 5. 通过校验后，添加用户消息到对话历史
         chatHistoryService.addChatMessage(appId, message, ChatHistoryMessageTypeEnum.USER.getValue(), loginUser.getId());
         // 6.调用AI生成代码
-        Flux<String> contentFlux = aiCodeGeneratorFacade.generateAndSaveCodeStream(message, codeGenEnum, appId);
+        Flux<String> contentStream = aiCodeGeneratorFacade.generateAndSaveCodeStream(message, codeGenEnum, appId);
         // 7. 收集AI响应内容并在完成后记录到对话历史
-        StringBuilder aiResponseBuilder = new StringBuilder();
-        return contentFlux
-                .map(chunk -> {
-                    aiResponseBuilder.append(chunk);
-                    return chunk;
-                })
-                .doOnComplete(() -> {
-                    // 流式响应完成后，添加AI消息到对话历史
-                    String aiResponse = aiResponseBuilder.toString();
-                    if(StrUtil.isNotBlank(aiResponse)){
-                        chatHistoryService.addChatMessage(appId, aiResponse, ChatHistoryMessageTypeEnum.AI.getValue(), loginUser.getId());
-                    }
-                })
-                .doOnError(error -> {
-                    // AI回复失败也要记录错误消息
-                    String errorMsg = "AI回复失败" + error.getMessage();
-                    chatHistoryService.addChatMessage(appId, errorMsg, ChatHistoryMessageTypeEnum.AI.getValue(), loginUser.getId());
-                });
+        return streamHandlerExecutor.doExecute(contentStream, chatHistoryService, appId, loginUser, codeGenEnum);
     }
 
     @Override
@@ -121,6 +117,17 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
         if(!sourceDir.exists() || !sourceDir.isDirectory()){
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "创建应用代码目录失败");
         }
+        // 6.1 构建 Vue 项目
+        CodeGenTypeEnum codeGenTypeEnum = CodeGenTypeEnum.getEnumByValue(codeGenType);
+        if(codeGenTypeEnum == CodeGenTypeEnum.VUE_PROJECT){
+            // Vue项目需要构建
+            boolean buildSuccess = vueProjectBuilder.buildProject(sourceDirPath);
+            ThrowUtils.throwIf(!buildSuccess, ErrorCode.OPERATION_ERROR, "构建 Vue 项目失败");
+            // 检查dist目录是否存在
+            File distDir = new File(sourceDirPath, "dist");
+            ThrowUtils.throwIf(!distDir.exists(), ErrorCode.OPERATION_ERROR, "构建 Vue 项目失败，dist目录不存在");
+            sourceDir = distDir;
+        }
         // 7. 复制文件到部署目录
         String deployDirPath = AppConstant.CODE_DEPLOY_ROOT_DIR + File.separator + deployKey;
         try {
@@ -136,7 +143,25 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
         boolean updateResult = this.updateById(updateApp);
         ThrowUtils.throwIf(!updateResult, ErrorCode.OPERATION_ERROR, "更新应用部署信息失败");
         // 9. 返回可访问的URL地址
-        return String.format("%s/%s", AppConstant.CODE_DEPLOY_HOST, deployKey);
+        String appDeployUrl = String.format("%s/%s", AppConstant.CODE_DEPLOY_HOST, deployKey);
+        // 10. 异步生成截图并且更新应用封面
+        generateAppScreenshotAsync(appId, appDeployUrl);
+        return appDeployUrl;
+    }
+
+    // 异步生成应用截图并更新数据库封面
+    @Override
+    public void generateAppScreenshotAsync(Long appId, String appUrl){
+        Thread.startVirtualThread(() -> {
+            // 调用截图服务生成截图并上传
+            String screenshotUrl = screenshotService.generateAndUploadScreenshot(appUrl);
+            // 更新数据库的封面
+            App app = new App();
+            app.setId(appId);
+            app.setCover(screenshotUrl);
+            boolean updated = this.updateById(app);
+            ThrowUtils.throwIf(!updated, ErrorCode.OPERATION_ERROR, "更新应用封面失败");
+        });
     }
 
     @Override

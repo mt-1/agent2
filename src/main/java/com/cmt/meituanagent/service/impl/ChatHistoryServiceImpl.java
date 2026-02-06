@@ -139,8 +139,10 @@ public class ChatHistoryServiceImpl extends ServiceImpl<ChatHistoryMapper, ChatH
             List<ChatHistory> historyList = this.list(queryWrapper);
             if(CollUtil.isEmpty(historyList))
                 return 0;
+            // 反转列表，确保按照时间正序（老的在前，新的在后）
             historyList = historyList.reversed();
             int loadCount = 0;
+            // 先清理历史缓存，防止重复加载
             chatMemory.clear();
             for(ChatHistory history : historyList)
             {
@@ -158,7 +160,7 @@ public class ChatHistoryServiceImpl extends ServiceImpl<ChatHistoryMapper, ChatH
         }catch (Exception e)
         {
             log.error("加载appId：{}的对话历史到内存时出错", appId, e);
-
+            // 加载失败不影响系统运行，只是没有历史上下文
             return 0;
         }
 
