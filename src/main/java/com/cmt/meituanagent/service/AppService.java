@@ -1,5 +1,6 @@
 package com.cmt.meituanagent.service;
 
+import com.cmt.meituanagent.model.dto.app.AppAddRequest;
 import com.cmt.meituanagent.model.dto.app.AppQueryRequest;
 import com.cmt.meituanagent.model.entity.User;
 import com.cmt.meituanagent.model.vo.AppVO;
@@ -32,6 +33,9 @@ public interface AppService extends IService<App> {
 
     // 通过应用id和用户输入的消息，生成代码
     Flux<String> chatToGenCode(Long appId, String message, User loginUser);
+
+    // 创建应用
+    Long createApp(AppAddRequest appAddRequest, User loginUser);
 
     // 应用部署
     String deployApp(Long appId, User loginUser);

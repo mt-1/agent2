@@ -1,9 +1,11 @@
 package com.cmt.meituanagent.service.impl;
 
+import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
+import com.cmt.meituanagent.ai.model.AiCodeGenTypeRoutingService;
 import com.cmt.meituanagent.constant.AppConstant;
 import com.cmt.meituanagent.core.AiCodeGeneratorFacade;
 import com.cmt.meituanagent.core.builder.VueProjectBuilder;
@@ -11,6 +13,7 @@ import com.cmt.meituanagent.core.handler.StreamHandlerExecutor;
 import com.cmt.meituanagent.exception.BusinessException;
 import com.cmt.meituanagent.exception.ErrorCode;
 import com.cmt.meituanagent.exception.ThrowUtils;
+import com.cmt.meituanagent.model.dto.app.AppAddRequest;
 import com.cmt.meituanagent.model.dto.app.AppQueryRequest;
 import com.cmt.meituanagent.model.entity.User;
 import com.cmt.meituanagent.model.enums.ChatHistoryMessageTypeEnum;
@@ -69,6 +72,9 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
     @Resource
     private ScreenshotService screenshotService;
 
+    @Resource
+    private AiCodeGenTypeRoutingService aiCodeGenTypeRoutingService;
+
 
     @Override
     public Flux<String> chatToGenCode(Long appId, String message, User loginUser) {
@@ -90,6 +96,26 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
         Flux<String> contentStream = aiCodeGeneratorFacade.generateAndSaveCodeStream(message, codeGenEnum, appId);
         // 7. 收集AI响应内容并在完成后记录到对话历史
         return streamHandlerExecutor.doExecute(contentStream, chatHistoryService, appId, loginUser, codeGenEnum);
+    }
+
+    @Override
+    public Long createApp(AppAddRequest appAddRequest, User loginUser) {
+        // 参数校验
+        String initPrompt = appAddRequest.getInitPrompt();
+        ThrowUtils.throwIf(StrUtil.isBlank(initPrompt), ErrorCode.PARAMS_ERROR, "初始化 prompt 不能为空");
+        // 构造入库对象
+        App app = new App();
+        BeanUtil.copyProperties(appAddRequest, app);
+        app.setUserId(loginUser.getId());
+        // 应用名称暂时为 initPrompt 前 12 位
+        app.setAppName(initPrompt.substring(0, Math.min(initPrompt.length(), 12)));
+        // 根据AI返回结果智能路由代码生成类型
+        CodeGenTypeEnum codeGenTypeEnum = aiCodeGenTypeRoutingService.routeCodeGenType(initPrompt);
+        app.setCodeGenType(codeGenTypeEnum.getValue());
+        // 插入数据库
+        boolean result = this.save(app);
+        ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
+        return app.getId();
     }
 
     @Override
@@ -148,6 +174,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
         generateAppScreenshotAsync(appId, appDeployUrl);
         return appDeployUrl;
     }
+
 
     // 异步生成应用截图并更新数据库封面
     @Override

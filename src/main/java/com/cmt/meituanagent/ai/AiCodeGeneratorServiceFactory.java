@@ -1,6 +1,6 @@
 package com.cmt.meituanagent.ai;
 
-import com.cmt.meituanagent.ai.tools.FileWriteTool;
+import com.cmt.meituanagent.ai.tools.*;
 import com.cmt.meituanagent.exception.BusinessException;
 import com.cmt.meituanagent.exception.ErrorCode;
 import com.cmt.meituanagent.model.enums.CodeGenTypeEnum;
@@ -86,7 +86,13 @@ public class AiCodeGeneratorServiceFactory {
                     .chatModel(chatModel)
                     .streamingChatModel(reasoningStreamingChatModel)
                     .chatMemoryProvider(memoryId -> chatMemory)
-                    .tools(new FileWriteTool())
+                    .tools(
+                            new FileWriteTool(),
+                            new FileReadTool(),
+                            new FileModifyTool(),
+                            new FileDirReadTool(),
+                            new FileDeleteTool()
+                    )
                     // 处理工具调用幻觉
                     .hallucinatedToolNameStrategy(toolExecutionRequest ->
                             ToolExecutionResultMessage.from(toolExecutionRequest, "Error: there is no tool called " + toolExecutionRequest.name()))
