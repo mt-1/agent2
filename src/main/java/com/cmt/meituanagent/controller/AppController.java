@@ -15,6 +15,8 @@ import com.cmt.meituanagent.exception.ThrowUtils;
 import com.cmt.meituanagent.model.dto.app.*;
 import com.cmt.meituanagent.model.entity.User;
 import com.cmt.meituanagent.model.vo.AppVO;
+import com.cmt.meituanagent.ratelimiter.annotation.RateLimit;
+import com.cmt.meituanagent.ratelimiter.enums.RateLimitType;
 import com.cmt.meituanagent.service.ProjectDownloadService;
 import com.cmt.meituanagent.service.UserService;
 import com.mybatisflex.core.paginate.Page;
@@ -58,6 +60,7 @@ public class AppController {
 
 
     @GetMapping(value = "/chat/gen/code", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @RateLimit(limitType = RateLimitType.USER, rate = 5, rateInterval = 60, message = "AI对话请求过于频繁，请稍后再试")
     public Flux<ServerSentEvent<String>> charToGenCode(@RequestParam Long appId, @RequestParam String message, HttpServletRequest request) {
         // 参数校验
         ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用 id 错误");
