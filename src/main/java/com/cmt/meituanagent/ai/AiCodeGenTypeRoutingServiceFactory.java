@@ -1,6 +1,5 @@
 package com.cmt.meituanagent.ai;
 
-import com.cmt.meituanagent.ai.model.AiCodeGenTypeRoutingService;
 import com.cmt.meituanagent.utils.SpringContextUtil;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.service.AiServices;
@@ -9,18 +8,21 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-//AI代码生成类型路由服务工厂
+// AI代码生成类型路由服务工厂
 @Slf4j
 @Configuration
 public class AiCodeGenTypeRoutingServiceFactory {
-    @Resource
-    private ChatModel chatModel;
 
     // 创建AI代码生成类型路由服务实例
-    @Bean
-    public AiCodeGenTypeRoutingService aiCodeGenTypeRoutingService() {
+    public AiCodeGenTypeRoutingService createAiCodeGenTypeRoutingService() {
+        ChatModel chatModel = SpringContextUtil.getBean("routingChatModelPrototype", ChatModel.class);
         return AiServices.builder(AiCodeGenTypeRoutingService.class)
                 .chatModel(chatModel)
                 .build();
+    }
+
+    @Bean
+    public AiCodeGenTypeRoutingService aiCodeGenTypeRoutingService() {
+        return createAiCodeGenTypeRoutingService();
     }
 }

@@ -1,4 +1,4 @@
-package com.cmt.meituanagent.ai.model;
+package com.cmt.meituanagent.ai;
 
 
 import com.cmt.meituanagent.model.enums.CodeGenTypeEnum;

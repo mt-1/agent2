@@ -3,7 +3,6 @@ package com.cmt.meituanagent.controller;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
-import com.cmt.meituanagent.ai.model.AiCodeGenTypeRoutingService;
 import com.cmt.meituanagent.annotation.AuthCheck;
 import com.cmt.meituanagent.common.BaseResponse;
 import com.cmt.meituanagent.common.DeleteRequest;
@@ -15,7 +14,6 @@ import com.cmt.meituanagent.exception.ErrorCode;
 import com.cmt.meituanagent.exception.ThrowUtils;
 import com.cmt.meituanagent.model.dto.app.*;
 import com.cmt.meituanagent.model.entity.User;
-import com.cmt.meituanagent.model.enums.CodeGenTypeEnum;
 import com.cmt.meituanagent.model.vo.AppVO;
 import com.cmt.meituanagent.service.ProjectDownloadService;
 import com.cmt.meituanagent.service.UserService;
@@ -24,6 +22,7 @@ import com.mybatisflex.core.query.QueryWrapper;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.*;
@@ -254,6 +253,11 @@ public class AppController {
      * @return 精选应用列表
      */
     @PostMapping("/good/list/page/vo")
+    @Cacheable(
+            value = "good_app_page",
+            key = "T(com.cmt.meituanagent.utils.CacheKeyUtils).generateCacheKey(#appQueryRequest)",
+            condition = "#appQueryRequest.pageNum <= 10"
+    )
     public BaseResponse<Page<AppVO>> listGoodAppVOByPage(@RequestBody AppQueryRequest appQueryRequest) {
         ThrowUtils.throwIf(appQueryRequest == null, ErrorCode.PARAMS_ERROR);
         // 限制每页最多 20 个
