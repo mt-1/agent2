@@ -3,6 +3,8 @@ package com.cmt.meituanagent.ai;
 import com.cmt.meituanagent.ai.tools.*;
 import com.cmt.meituanagent.exception.BusinessException;
 import com.cmt.meituanagent.exception.ErrorCode;
+import com.cmt.meituanagent.guardrail.PromptSafetyInputGuardrail;
+import com.cmt.meituanagent.guardrail.RetryOutputGuardrail;
 import com.cmt.meituanagent.model.enums.CodeGenTypeEnum;
 import com.cmt.meituanagent.service.ChatHistoryService;
 import com.cmt.meituanagent.utils.SpringContextUtil;
@@ -101,6 +103,12 @@ public class AiCodeGeneratorServiceFactory {
                     // 处理工具调用幻觉
                     .hallucinatedToolNameStrategy(toolExecutionRequest ->
                             ToolExecutionResultMessage.from(toolExecutionRequest, "Error: there is no tool called " + toolExecutionRequest.name()))
+                    // 最大连续调用工具次数，避免无限循环
+                    .maxSequentialToolsInvocations(20)
+                    // 添加输入护轨
+                    .inputGuardrails(new PromptSafetyInputGuardrail())
+                    // 添加输出护轨，为了流式输出，这里不使用
+//                    .outputGuardrails(new RetryOutputGuardrail())
                     .build();
             }
 
@@ -113,6 +121,10 @@ public class AiCodeGeneratorServiceFactory {
                     .chatModel(chatModel)
                     .streamingChatModel(openAiStreamingChatModel)
                     .chatMemory(chatMemory)
+                    // 添加输入护轨
+                    .inputGuardrails(new PromptSafetyInputGuardrail())
+                    // 添加输出护轨，为了流式输出，这里不使用
+//                    .outputGuardrails(new RetryOutputGuardrail())
                     .build();
             }
             default -> throw new BusinessException(ErrorCode.SYSTEM_ERROR, "不支持的代码生成类型: " + codeGenType.getValue());
