@@ -6,6 +6,7 @@ target/
 
 ### me ###
 **/application.yml
+**/application-prod.yml
 tmp/
 
 

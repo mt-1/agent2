@@ -1,5 +1,5 @@
-create database if not exists meituan_agent;
-use meituan_agent;
+create database if not exists ai_agent;
+use ai_agent;
 
 -- 用户表
 create table if not exists user
