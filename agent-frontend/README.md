@@ -1,5 +1,3 @@
-# 鱼皮 AI 代码生成器 - 前端
-
 这是一个基于 Vue 3 + TypeScript + Ant Design Vue 的 AI 代码生成器前端项目。用户可以通过与 AI 对话来创建网站应用、查看生成的网站应用效果、部署应用、管理个人应用等。
 
 ## 功能特性
@@ -168,7 +166,3 @@ npm run lint
 3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
 4. 推送到分支 (`git push origin feature/AmazingFeature`)
 5. 打开 Pull Request
-
-## 许可证
-
-本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情
